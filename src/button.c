@@ -47,42 +47,27 @@ static bool picok_board_button_read(void) {
     return boot_state == 0;
 }
 #elif defined(PICO_PLATFORM)
-static bool __no_inline_not_in_flash_func(picok_get_bootsel_button)(void) {
-    const uint CS_PIN_INDEX = 1;
+// GPIO pins para botones (puentes a GND)
+#define BUTTON_GPIO_15 15
+#define BUTTON_GPIO_0  0
 
-    // Must disable interrupts, as interrupt handlers may be in flash, and we
-    // are about to temporarily disable flash access!
-    uint32_t flags = save_and_disable_interrupts();
-
-    // Set chip select to Hi-Z
-    hw_write_masked(&ioqspi_hw->io[CS_PIN_INDEX].ctrl,
-                    GPIO_OVERRIDE_LOW << IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_LSB,
-                    IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_BITS);
-
-    // Note we can't call into any sleep functions in flash right now
-    for (volatile int i = 0; i < 1000; ++i);
-
-    // The HI GPIO registers in SIO can observe and control the 6 QSPI pins.
-    // Note the button pulls the pin *low* when pressed.
-#ifdef PICO_RP2040
-    #define CS_BIT (1u << 1)
-#else
-    #define CS_BIT SIO_GPIO_HI_IN_QSPI_CSN_BITS
-#endif
-    bool button_state = !(sio_hw->gpio_hi_in & CS_BIT);
-
-    // Need to restore the state of chip select, else we are going to have a
-    // bad time when we return to code in flash!
-    hw_write_masked(&ioqspi_hw->io[CS_PIN_INDEX].ctrl,
-                    GPIO_OVERRIDE_NORMAL << IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_LSB,
-                    IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_BITS);
-
-    restore_interrupts(flags);
-
-    return button_state;
+static void button_gpio_init(void) {
+    // Inicializar GPIO 15
+    gpio_init(BUTTON_GPIO_15);
+    gpio_set_dir(BUTTON_GPIO_15, GPIO_IN);
+    gpio_pull_up(BUTTON_GPIO_15);
+    
+    // Inicializar GPIO 0
+    gpio_init(BUTTON_GPIO_0);
+    gpio_set_dir(BUTTON_GPIO_0, GPIO_IN);
+    gpio_pull_up(BUTTON_GPIO_0);
 }
+
 static bool picok_board_button_read(void) {
-  return picok_get_bootsel_button();
+    // Leer GPIO 15 o GPIO 0 (ambos activos en bajo cuando se cierran a GND)
+    bool button_15 = !gpio_get(BUTTON_GPIO_15);
+    bool button_0 = !gpio_get(BUTTON_GPIO_0);
+    return button_15 || button_0;  // Retorna true si alguno está presionado
 }
 #else
 static bool picok_board_button_read(void) {
@@ -156,4 +141,3 @@ void button_task(void) {
     }
 #endif
 }
-
