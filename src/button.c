@@ -51,7 +51,7 @@ static bool picok_board_button_read(void) {
 #define BUTTON_GPIO_15 15
 #define BUTTON_GPIO_0  0
 
-static void button_gpio_init(void) {
+void button_gpio_init(void) {
     // Inicializar GPIO 15
     gpio_init(BUTTON_GPIO_15);
     gpio_set_dir(BUTTON_GPIO_15, GPIO_IN);
