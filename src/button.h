@@ -27,5 +27,6 @@
 
 extern bool button_wait(void);
 extern void button_task(void);
+extern void button_gpio_init(void);
 
 #endif // BUTTON_H
