@@ -52,6 +52,7 @@ static bool picok_board_button_read(void) {
 #define BUTTON_GPIO_0  0
 
 void button_gpio_init(void) {
+    printf("[BUTTON] Initializing GPIO 15 and GPIO 0\n");
     // Inicializar GPIO 15
     gpio_init(BUTTON_GPIO_15);
     gpio_set_dir(BUTTON_GPIO_15, GPIO_IN);
@@ -61,13 +62,19 @@ void button_gpio_init(void) {
     gpio_init(BUTTON_GPIO_0);
     gpio_set_dir(BUTTON_GPIO_0, GPIO_IN);
     gpio_pull_up(BUTTON_GPIO_0);
+    printf("[BUTTON] GPIO initialized successfully\n");
 }
 
 static bool picok_board_button_read(void) {
     // Leer GPIO 15 o GPIO 0 (ambos activos en bajo cuando se cierran a GND)
     bool button_15 = !gpio_get(BUTTON_GPIO_15);
     bool button_0 = !gpio_get(BUTTON_GPIO_0);
-    return button_15 || button_0;  // Retorna true si alguno está presionado
+    bool pressed = button_15 || button_0;
+    
+    if (pressed) {
+        printf("[BUTTON] Button pressed! GPIO15=%d, GPIO0=%d\n", button_15, button_0);
+    }
+    return pressed;
 }
 #else
 static bool picok_board_button_read(void) {
@@ -124,9 +131,11 @@ void button_task(void) {
     if (button_pressed_cb && board_millis() > 1000 && !is_busy()) { // wait 1 second to boot up
         bool current_button_state = picok_board_button_read();
         if (current_button_state != button_pressed_state) {
+            printf("[BUTTON] Button state changed: %d -> %d\n", button_pressed_state, current_button_state);
             if (current_button_state == false) { // unpressed
                 if (button_pressed_time == 0 || button_pressed_time + 1000 > board_millis()) {
                     button_press++;
+                    printf("[BUTTON] Press count: %d\n", button_press);
                 }
                 button_pressed_time = board_millis();
             }
@@ -134,9 +143,17 @@ void button_task(void) {
         }
         if (button_pressed_time > 0 && button_press > 0 && button_pressed_time + 1000 < board_millis() && button_pressed_state == false) {
             if (button_pressed_cb != NULL) {
+                printf("[BUTTON] Calling callback with %d presses\n", button_press);
                 (*button_pressed_cb)(button_press);
             }
             button_pressed_time = button_press = 0;
+        }
+    }
+    else if (!button_pressed_cb && board_millis() > 1000) {
+        static uint32_t last_log = 0;
+        if (board_millis() - last_log > 5000) {
+            printf("[BUTTON] Callback not registered yet\n");
+            last_log = board_millis();
         }
     }
 #endif
